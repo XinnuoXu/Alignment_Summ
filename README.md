@@ -14,6 +14,11 @@ pip install pytorch_transformers
 pip install pyrouge
 pip install tensorboardX
 ```
+Create some files
+```
+cd ./Alignment_Summ
+mkdir data jsons logs models XSum
+```
 
 ## Data processing
 Put all data in file `./XSum` and run
