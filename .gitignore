@@ -4,7 +4,9 @@ available_models/
 amrtotext_*
 log.txt
 models/*
-logs/
+logs/*
+jsons/*
+data/*
 temp/
 amr.log*
 nohup*
@@ -27,7 +29,6 @@ multi-bleu.perl
 .idea
 *.sublime-*
 .DS_Store
-data/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
