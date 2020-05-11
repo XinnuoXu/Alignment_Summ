@@ -16,4 +16,34 @@ pip install tensorboardX
 ```
 
 ## Data processing
-Put all data in file `./XSum`
+Put all data in file `./XSum` and run
+```
+cd ./src
+sh ./scripts/preprocess_json.sh
+sh ./scripts/preprocess.sh
+```
+
+## Model training
+Stay in `./src` and run 
+```
+sh ./scripts/train.sh
+```
+All checkpoints will be saved in `./models`
+
+## Validation and test for top 5 models
+Stay in `./src` and run 
+```
+sh ./scripts/test_all.sh
+```
+
+## Test specific model
+Stay in `./src` and edit `-test_from` in file `./scripts/test.sh`. Run
+```
+sh ./scripts/test.sh
+```
+Results will be saved in three files in `./logs`
+```
+abs_bert_cnndm.{model_checkpoint_num}.gold
+abs_bert_cnndm.{model_checkpoint_num}.candidate
+abs_bert_cnndm.{model_checkpoint_num}.raw_src
+```
