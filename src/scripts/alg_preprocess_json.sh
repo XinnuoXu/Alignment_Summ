@@ -1,7 +1,7 @@
 #!/bin/bash
 
-RAW_PATH=/scratch/xxu/bert/s2s_alignment/xsum_
-JSON_PATH=/scratch/xxu/bert/jsons/xsum
+RAW_PATH=../../Document_highlight.BERT/highlights.bert/s2s_alignment/xsum_
+JSON_PATH=../test_json/xsum
 
 python preprocess.py \
 	-mode format_xsum_shard_only \

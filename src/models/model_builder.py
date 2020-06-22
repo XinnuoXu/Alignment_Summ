@@ -2,7 +2,7 @@ import copy
 
 import torch
 import torch.nn as nn
-from pytorch_transformers import BertModel, BertConfig, BertTokenizer
+from pytorch_transformers import BertModel, BertConfig
 from torch.nn.init import xavier_uniform_
 
 from models.decoder import TransformerDecoder
@@ -207,8 +207,7 @@ class AbsSummarizer(nn.Module):
         self.decoder = TransformerDecoder(
             self.args.dec_layers,
             self.args.dec_hidden_size, heads=self.args.dec_heads,
-            d_ff=self.args.dec_ff_size, dropout=self.args.dec_dropout, 
-            embeddings=tgt_embeddings)
+            d_ff=self.args.dec_ff_size, dropout=self.args.dec_dropout, embeddings=tgt_embeddings)
 
         self.generator = get_generator(self.vocab_size, self.args.dec_hidden_size, device)
         self.generator[0].weight = self.decoder.embeddings.weight
@@ -238,34 +237,8 @@ class AbsSummarizer(nn.Module):
 
         self.to(device)
 
-        if args.attn_debug != "":
-            self.vocab = BertTokenizer.from_pretrained('bert-base-uncased', do_lower_case=True)
-
-    def forward(self, src, tgt, segs, clss, mask_src, mask_tgt, mask_cls):
+    def forward(self, src, tgt, segs, clss, mask_src, mask_tgt, mask_cls, attn_debug=False):
         top_vec = self.bert(src, segs, mask_src)
         dec_state = self.decoder.init_decoder_state(src, top_vec)
-        decoder_outputs, state, cross_attns = self.decoder(tgt[:, :-1], top_vec, dec_state)
-        if self.args.attn_debug != "":
-            import time
-            attn_debug_path = self.args.attn_debug + "/" + str(int(time.time()*1000))
-            src_terms = self.vocab.convert_ids_to_tokens(src[0].tolist())
-            tgt_terms = self.vocab.convert_ids_to_tokens(tgt[:, :-1][0].tolist())
-            src_terms = [tok.replace(',', ';') for tok in src_terms]
-            tgt_terms = [tok.replace(',', ';') for tok in tgt_terms]
-            sumlist = []
-            for i, layer in enumerate(cross_attns):
-                sumlist.append(torch.sum(layer[0], dim=0))
-                for j, head in enumerate(layer[0]):
-                    fpout = open(attn_debug_path + ".L" + str(i) + ".H" + str(j), 'w')
-                    fpout.write("model," + ",".join(src_terms) + "\n")
-                    for t, tok in enumerate(tgt_terms):
-                        fpout.write(tok + "," + ",".join([str(s) for s in head[t].tolist()]) + "\n")
-                    fpout.close()
-            softmax = nn.Softmax(dim=-1)
-            sum_attn_debug = softmax(torch.stack(sumlist, dim=0).sum(dim=0))
-            fpout = open(attn_debug_path + ".SUM", 'w')
-            fpout.write("model," + ",".join(src_terms) + "\n")
-            for t, tok in enumerate(tgt_terms):
-                fpout.write(tok + "," + ",".join([str(s) for s in sum_attn_debug[t].tolist()]) + "\n")
-            fpout.close()
-        return decoder_outputs, None
+        decoder_outputs, state = self.decoder(tgt[:, :-1], top_vec, dec_state, attn_debug=attn_debug)
+        return decoder_outputs, state, top_vec

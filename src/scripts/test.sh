@@ -1,7 +1,7 @@
 #!/bin/bash
 
-BERT_DATA_PATH=../../data/xsum
-MODEL_PATH=../../models/
+BERT_DATA_PATH=../test_data/xsum
+MODEL_PATH=../models.alg/
 
 python train.py \
 	-task abs \
@@ -9,14 +9,13 @@ python train.py \
 	-batch_size 3000 \
 	-test_batch_size 500 \
 	-bert_data_path ${BERT_DATA_PATH} \
-	-log_file ../../logs/val_abs_bert_cnndm \
-	-test_from ${MODEL_PATH}model_step_44000.pt \
+	-log_file ../logs/val_abs_bert_cnndm \
+	-test_from ${MODEL_PATH}model_step_16000.pt \
 	-sep_optim true \
 	-use_interval true \
-	-visible_gpus 0,1,2 \
+	-visible_gpus 0 \
 	-max_pos 512 \
 	-min_length 20 \
 	-max_length 100 \
 	-alpha 0.9 \
-	-result_path ../../logs/abs_bert_cnndm
-
+	-result_path ../logs/abs_bert_cnndm

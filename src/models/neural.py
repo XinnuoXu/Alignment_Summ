@@ -424,6 +424,7 @@ class MultiHeadedAttention(nn.Module):
             attn = torch.cat([attn[:, :-1], attn_masked.unsqueeze(1)], 1)
 
         drop_attn = self.dropout(attn)
+
         if (self.use_final_linear):
             context = unshape(torch.matmul(drop_attn, value))
             output = self.final_linear(context)

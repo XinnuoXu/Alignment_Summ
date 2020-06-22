@@ -234,7 +234,8 @@ class BertData():
             for item in alignment[j]:
                 alg.append(sum(item)/len(item))
                 alg.extend(item)
-                alg.append(0.0)
+                #alg.append(0.0)
+                alg.append(sum(item)/len(item))
             new_alignment.append(alg)
         return new_alignment
 
@@ -263,7 +264,7 @@ class BertData():
         return new_alignment
 
 
-    def preprocess(self, src, tgt, sent_labels, use_bert_basic_tokenizer=False, is_test=False):
+    def preprocess(self, src, tgt, alignment, sent_labels, use_bert_basic_tokenizer=False, is_test=False):
 
         if ((not is_test) and len(src) == 0):
             return None
@@ -282,6 +283,8 @@ class BertData():
         # Cut src
         src = [src[i][:self.args.max_src_ntokens_per_sent] for i in idxs]
         src = src[:self.args.max_src_nsents]
+        # Cut alignment
+        alignment = self.reshape_alignment(idxs, self.args.max_src_ntokens_per_sent, self.args.max_src_nsents, alignment)
         # Cut sent_labels
         sent_labels = [_sent_labels[i] for i in idxs]
         sent_labels = sent_labels[:self.args.max_src_nsents]
@@ -294,23 +297,38 @@ class BertData():
         src_subtokens = self.tokenizer.tokenize(text)
         src_subtokens = [self.cls_token] + src_subtokens + [self.sep_token]
 
+        # add [SEP] [CLS] score for alignment
+        alignment = self.cls_alignment(alignment)
+        # Change alignment as the tokenize res
+        alignment = self.tokenize_alignment(src_subtokens, alignment)
+
         src_subtoken_idxs = self.tokenizer.convert_tokens_to_ids(src_subtokens)
         _segs = [-1] + [i for i, t in enumerate(src_subtoken_idxs) if t == self.sep_vid]
         segs = [_segs[i] - _segs[i - 1] for i in range(1, len(_segs))]
         segments_ids = []
         for i, s in enumerate(segs):
-            segments_ids += s * [0]
-            '''
             if (i % 2 == 0):
                 segments_ids += s * [0]
             else:
                 segments_ids += s * [1]
-            '''
         cls_ids = [i for i, t in enumerate(src_subtoken_idxs) if t == self.cls_vid]
         sent_labels = sent_labels[:len(cls_ids)]
 
-        tgt_subtokens_str = '[unused0] ' + ' [unused2] '.join(
-            [' '.join(self.tokenizer.tokenize(' '.join(tt), use_bert_basic_tokenizer=use_bert_basic_tokenizer)) for tt in tgt]) + ' [unused1]'
+        
+        '''
+        temp codes start
+        '''
+        tgt = tgt[0]
+        tgt = tgt[1:] #tgt = [[SUMMARY] tok1 tok2 tok3]
+        tgt_subtokens_str = '[unused0] ' + ' '.join(self.tokenizer.tokenize(' '.join(tgt), use_bert_basic_tokenizer=use_bert_basic_tokenizer)) + ' [unused1]'
+        alignment = self.tgt_alignment(alignment, tgt_subtokens_str)
+        alignment = alignment[:self.args.max_tgt_ntokens]
+        '''
+        temp codes end
+        '''
+
+        #tgt_subtokens_str = '[unused0] ' + ' [unused2] '.join(
+        #    [' '.join(self.tokenizer.tokenize(' '.join(tt), use_bert_basic_tokenizer=use_bert_basic_tokenizer)) for tt in tgt]) + ' [unused1]'
 
         tgt_subtoken = tgt_subtokens_str.split()[:self.args.max_tgt_ntokens]
         if ((not is_test) and len(tgt_subtoken) < self.args.min_tgt_ntokens):
@@ -318,17 +336,25 @@ class BertData():
 
         tgt_subtoken_idxs = self.tokenizer.convert_tokens_to_ids(tgt_subtoken)
 
-        tgt_txt = '<q>'.join([' '.join(tt) for tt in tgt])
+
+        '''
+        temp codes start
+        '''
+        tgt_txt = ' '.join(tgt)
+        '''
+        temp codes end
+        '''
+        #tgt_txt = '<q>'.join([' '.join(tt) for tt in tgt])
         src_txt = [original_src_txt[i] for i in idxs]
 
-        return src_subtoken_idxs, sent_labels, tgt_subtoken_idxs, segments_ids, cls_ids, src_txt, tgt_txt
+        return src_subtoken_idxs, sent_labels, tgt_subtoken_idxs, segments_ids, cls_ids, src_txt, tgt_txt, alignment
 
 
 def format_to_bert(args):
     if (args.dataset != ''):
         datasets = [args.dataset]
     else:
-        datasets = ['dev', 'train', 'test', '50doc']
+        datasets = ['dev', 'train', 'test']
     for corpus_type in datasets:
         a_lst = []
         for json_f in glob.glob(pjoin(args.raw_path, '*' + corpus_type + '.*.json')):
@@ -355,20 +381,28 @@ def _format_to_bert(params):
     jobs = json.load(open(json_file))
     datasets = []
     for d in jobs:
-        source, tgt = d['src'], d['tgt']
+        d = json.loads(d)
+        source, tgt, alignment = d['src'], d['tgt'], d['alignment']
+
+        # temp code
+        tgt = [tgt]
+        # temp code end
 
         sent_labels = greedy_selection(source[:args.max_src_nsents], tgt, 3)
         if (args.lower):
             source = [' '.join(s).lower().split() for s in source]
             tgt = [' '.join(s).lower().split() for s in tgt]
-        b_data = bert.preprocess(source, tgt, sent_labels, use_bert_basic_tokenizer=args.use_bert_basic_tokenizer, is_test=is_test)
+        b_data = bert.preprocess(source, tgt, alignment, sent_labels, \
+                use_bert_basic_tokenizer=args.use_bert_basic_tokenizer, \
+                is_test=is_test)
+        # b_data = bert.preprocess(source, tgt, sent_labels, use_bert_basic_tokenizer=args.use_bert_basic_tokenizer)
 
         if (b_data is None):
             continue
-        src_subtoken_idxs, sent_labels, tgt_subtoken_idxs, segments_ids, cls_ids, src_txt, tgt_txt = b_data
+        src_subtoken_idxs, sent_labels, tgt_subtoken_idxs, segments_ids, cls_ids, src_txt, tgt_txt, alignment = b_data
         b_data_dict = {"src": src_subtoken_idxs, "tgt": tgt_subtoken_idxs,
                        "src_sent_labels": sent_labels, "segs": segments_ids, 'clss': cls_ids,
-                       'src_txt': src_txt, "tgt_txt": tgt_txt}
+                       'src_txt': src_txt, "tgt_txt": tgt_txt, "alignment": alignment}
         datasets.append(b_data_dict)
     logger.info('Processed instances %d' % len(datasets))
     logger.info('Saving to %s' % save_file)
@@ -492,7 +526,7 @@ def format_xsum_to_lines_easy(args):
     if (args.dataset != ''):
         datasets = [args.dataset]
     else:
-        datasets = ['train', 'test', 'dev', '50doc']
+        datasets = ['train', 'test', 'dev']
 
     for corpus_type in datasets:
         root_src = args.raw_path + corpus_type + "_src.jsonl"
@@ -533,7 +567,7 @@ def format_xsum_shard_only(args):
     if (args.dataset != ''):
         datasets = [args.dataset]
     else:
-        datasets = ['train', 'test', 'dev', '50doc']
+        datasets = ['train', 'test', 'dev']
 
     for corpus_type in datasets:
         root = args.raw_path + corpus_type + "_src.jsonl"

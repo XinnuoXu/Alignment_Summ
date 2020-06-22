@@ -140,34 +140,30 @@ def validate_abs(args, device_id):
             step = int(cp.split('.')[-2].split('_')[-1])
             test_abs(args, device_id, cp, step)
     else:
-        if args.test_from != "":
-            step = args.test_from.split('_')[-1].split('.')[0]
-            validate(args, device_id, args.test_from, step)
-        else:
-            while (True):
-                cp_files = sorted(glob.glob(os.path.join(args.model_path, 'model_step_*.pt')))
-                cp_files.sort(key=os.path.getmtime)
-                if (cp_files):
-                    cp = cp_files[-1]
-                    time_of_cp = os.path.getmtime(cp)
-                    if (not os.path.getsize(cp) > 0):
-                        time.sleep(60)
-                        continue
-                    if (time_of_cp > timestep):
-                        timestep = time_of_cp
-                        step = int(cp.split('.')[-2].split('_')[-1])
-                        validate(args, device_id, cp, step)
-                        test_abs(args, device_id, cp, step)
+        while (True):
+            cp_files = sorted(glob.glob(os.path.join(args.model_path, 'model_step_*.pt')))
+            cp_files.sort(key=os.path.getmtime)
+            if (cp_files):
+                cp = cp_files[-1]
+                time_of_cp = os.path.getmtime(cp)
+                if (not os.path.getsize(cp) > 0):
+                    time.sleep(60)
+                    continue
+                if (time_of_cp > timestep):
+                    timestep = time_of_cp
+                    step = int(cp.split('.')[-2].split('_')[-1])
+                    validate(args, device_id, cp, step)
+                    test_abs(args, device_id, cp, step)
 
-                cp_files = sorted(glob.glob(os.path.join(args.model_path, 'model_step_*.pt')))
-                cp_files.sort(key=os.path.getmtime)
-                if (cp_files):
-                    cp = cp_files[-1]
-                    time_of_cp = os.path.getmtime(cp)
-                    if (time_of_cp > timestep):
-                        continue
-                else:
-                    time.sleep(300)
+            cp_files = sorted(glob.glob(os.path.join(args.model_path, 'model_step_*.pt')))
+            cp_files.sort(key=os.path.getmtime)
+            if (cp_files):
+                cp = cp_files[-1]
+                time_of_cp = os.path.getmtime(cp)
+                if (time_of_cp > timestep):
+                    continue
+            else:
+                time.sleep(300)
 
 
 def validate(args, device_id, pt, step):
@@ -187,14 +183,9 @@ def validate(args, device_id, pt, step):
     model = AbsSummarizer(args, device, checkpoint)
     model.eval()
 
-    if args.test_data == "50doc":
-        valid_iter = data_loader.Dataloader(args, load_dataset(args, '50doc', shuffle=False),
-                                           args.test_batch_size, device,
-                                           shuffle=False, is_test=False)
-    else:
-        valid_iter = data_loader.Dataloader(args, load_dataset(args, 'dev', shuffle=False),
-                                            args.batch_size, device,
-                                            shuffle=False, is_test=False)
+    valid_iter = data_loader.Dataloader(args, load_dataset(args, 'dev', shuffle=False),
+                                        args.batch_size, device,
+                                        shuffle=False, is_test=False)
 
     tokenizer = BertTokenizer.from_pretrained('bert-base-uncased', do_lower_case=True, cache_dir=args.temp_dir)
     symbols = {'BOS': tokenizer.vocab['[unused0]'], 'EOS': tokenizer.vocab['[unused1]'],
@@ -257,14 +248,9 @@ def test_abs(args, device_id, pt, step):
     model = AbsSummarizer(args, device, checkpoint)
     model.eval()
 
-    if args.test_data == "50doc":
-        test_iter = data_loader.Dataloader(args, load_dataset(args, '50doc', shuffle=False),
-                                           args.test_batch_size, device,
-                                           shuffle=False, is_test=True)
-    else:
-        test_iter = data_loader.Dataloader(args, load_dataset(args, 'test', shuffle=False),
-                                           args.test_batch_size, device,
-                                           shuffle=False, is_test=True)
+    test_iter = data_loader.Dataloader(args, load_dataset(args, 'test', shuffle=False),
+                                       args.test_batch_size, device,
+                                       shuffle=False, is_test=True)
     tokenizer = BertTokenizer.from_pretrained('bert-base-uncased', do_lower_case=True, cache_dir=args.temp_dir)
     symbols = {'BOS': tokenizer.vocab['[unused0]'], 'EOS': tokenizer.vocab['[unused1]'],
                'PAD': tokenizer.vocab['[PAD]'], 'EOQ': tokenizer.vocab['[unused2]']}
